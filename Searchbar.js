@@ -1,5 +1,7 @@
 import React from "react";
 import {Menu, MenuDivider, MenuHeader, MenuItem, Typeahead} from 'react-bootstrap-typeahead';
+import {groupBy, map} from 'lodash';
+import * as LibraryActions from "../../actions/LibraryActions"
 import DbGameStore from "../../stores/DbGameStore";
 
 
@@ -7,12 +9,8 @@ export default class Searchbar extends React.Component {
 
   constructor(props) {
       super(props);
-      this.initList = this.initList.bind(this);
-      this.updateList = this.updateList.bind(this);
-
-      //const dbGameList = DbGameStore.getAll();
-
-      //const peopleList = PeopleStore.getAll();
+      this.setSearchList = this.setSearchList.bind(this);
+      this.renderMenu = this.renderMenu.bind(this);
 
       this.state = {
         disabled: false,
@@ -22,30 +20,26 @@ export default class Searchbar extends React.Component {
         listData: [{id: 1, name: "Games and people not yet loaded", type: "games"}]
       };
 
-      //console.log("db game list: " + this.state.dbGameList[0].title).
-      //this.state.listData = this.initList()
-      //listData = this.initList();
+      LibraryActions.getAllGames();
+
     }
 
     componentWillMount() {
-        DbGameStore.on("change", this.updateList);
+        DbGameStore.on("change", this.setSearchList);
     }
 
     componentWillUnmount() {
-        DbGameStore.removeListener("change", this.updateList);
-    }
-
-    getDbGames(){
-        this.setState({
-            dbGameList: DbGameStore.getAll()
-        });
+        DbGameStore.removeListener("change", this.setSearchList);
     }
 
     // merge games and people into a single list
-    initList(){
+    setSearchList(){
+      this.setState({
+          dbGameList: DbGameStore.getAll()
+      });
       if(this.state.dbGameList == null){
         console.log("db game was not yet initialized")
-        return [{id: 0, name: "nothing to show", type: "games"}];
+        return;
       }
       var dbGameList = this.state.dbGameList;
       console.log(" size of game list: " + dbGameList.length)
@@ -68,7 +62,7 @@ export default class Searchbar extends React.Component {
       }
 
       var peopleListIdx = 0;
-      for(id; id < dbGameList.length + peopleList.length; id++, peopleListIdx++){
+      for(id; id < (dbGameList.length + peopleList.length); id++, peopleListIdx++){
         gamesAndPeopleList.push(peopleList[peopleListIdx]);
         gamesAndPeopleList[id].id = id;
         gamesAndPeopleList[id].type = "people";
@@ -77,42 +71,36 @@ export default class Searchbar extends React.Component {
 
       console.log("the game/people list was successfully initialized and has size: " + gamesAndPeopleList.length)
 
-      return gamesAndPeopleList;
-    }
-
-    updateList(){
-      // console.log("DB store changed")
-      // this.state.dbGameList = DbGameStore.getAll();
-      // console.log("dbGameList is this big: " + this.state.dbGameList);
-      // this.initList();
-    }
+      this.setState({listData: gamesAndPeopleList})
+}
 
     handleChange(){
       console.log("a search item was selected")
     }
 
     renderMenu(results, menuProps) {
-    let idx = 0;
-    const grouped = groupBy(results, r => r.type); // type is "games" or "people"
-    const items = Object.keys(grouped).sort().map(type => {
-      return [
-        !!idx && <MenuDivider key={`${type}-divider`} />,
-        <MenuHeader key={`${type}-header`}>
-          {type}
-        </MenuHeader>,
-        map(grouped[type], listObj => {
-          const item =
-            <MenuItem key={idx} option={listObj} position={idx}>
-              {listObj.name}
-            </MenuItem>;
+      console.log("renderMenu was executed")
+      let idx = 0;
+      const grouped = groupBy(results, r => r.type); // type is "games" or "people"
+      const items = Object.keys(grouped).sort().map(type => {
+        return [
+          !!idx && <MenuDivider key={`${type}-divider`} />,
+          <MenuHeader key={`${type}-header`}>
+            {type}
+          </MenuHeader>,
+          map(grouped[type], listObj => {
+            const item =
+              <MenuItem key={idx} option={listObj} position={idx}>
+                {listObj.name}
+              </MenuItem>;
 
-          idx++;
-          return item;
-        }),
-      ];
-    });
+            idx++;
+            return item;
+          }),
+        ];
+      });
 
-    return <Menu {...menuProps}>{items}</Menu>;
+      return <Menu {...menuProps}>{items}</Menu>;
   }
 
     render() {
@@ -141,18 +129,21 @@ export default class Searchbar extends React.Component {
         {id: 12, name: 'klutzGamer', type: 'people'},
       ];
 
+      var listData = this.state.listData
+
       return (
         <div>
           <Typeahead
-            {...this.state}
+            {...props}
             emptyLabel={emptyLabel ? '' : undefined}
             labelKey="name"
-            options={myData}
-            placeholder="Search people and games..."
+            options={listData}
+            placeholder="Search..."
             onChange={this.handleChange}
+
 
           />
         </div>
       )
     }
-  }js
+  }
